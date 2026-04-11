@@ -358,9 +358,43 @@
       sendMessage();
     });
 
+    async function sendAttention(extraEmail) {
+      try {
+        const body = JSON.stringify(extraEmail ? { email: extraEmail } : {});
+        const res = await fetch('/api/attention', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+        });
+        const data = await res.json();
+        if (res.ok) {
+          addSystemMsg('✅ Notificación enviada por email.');
+        } else {
+          addSystemMsg(`⚠️ ${data.error || 'Error al enviar notificación.'}`);
+        }
+      } catch (err) {
+        console.error('Error al llamar /api/attention:', err);
+        addSystemMsg('⚠️ No se pudo conectar con el servidor para enviar la notificación.');
+      }
+    }
+
     function sendMessage() {
       const text = inputEl.value.trim();
-      if (!text || !peerPresent || !ws || ws.readyState !== WebSocket.OPEN) return;
+      if (!text) return;
+
+      // Comando "attention [email_opcional]"
+      const attentionMatch = text.match(/^attention(?:\s+(\S+))?$/i);
+      if (attentionMatch) {
+        const extraEmail = attentionMatch[1] || '';
+        sendAttention(extraEmail);
+        inputEl.value = '';
+        inputEl.style.height = 'auto';
+        updateSendBtn();
+        inputEl.focus();
+        return;
+      }
+
+      if (!peerPresent || !ws || ws.readyState !== WebSocket.OPEN) return;
 
       ws.send(JSON.stringify({ id: myId, text }));
       addBubble(text, 'own');

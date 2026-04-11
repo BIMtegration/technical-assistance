@@ -3,20 +3,75 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const WebSocket = require('ws');
+const nodemailer = require('nodemailer');
 
 // 2. Configuración inicial
 const port = process.env.PORT || 3000; // Render usará una variable, nosotros usamos 3000
 const MAX_TEXT_LENGTH = 1000;
+
+// Configuración de email (variables de entorno)
+const EMAIL_HOST     = process.env.EMAIL_HOST;
+const EMAIL_PORT     = parseInt(process.env.EMAIL_PORT || '587', 10);
+const EMAIL_USER     = process.env.EMAIL_USER;
+const EMAIL_PASS     = process.env.EMAIL_PASS;
+const EMAIL_FROM     = process.env.EMAIL_FROM || EMAIL_USER;
+const EMAIL_TO       = process.env.EMAIL_TO;       // destinatario principal
+const EMAIL_TO_2     = process.env.EMAIL_TO_2;     // segundo destinatario (opcional)
 
 const app = express();
 const server = http.createServer(app);
 
 // Servir archivos estáticos desde /public
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
 
 // Ruta HTTP raíz — devuelve la UI del chat
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Validación básica de formato de email
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Transporter reutilizable (sólo si el email está configurado)
+const transporter = (EMAIL_HOST && EMAIL_USER && EMAIL_PASS)
+  ? nodemailer.createTransport({
+      host: EMAIL_HOST,
+      port: EMAIL_PORT,
+      secure: EMAIL_PORT === 465,
+      auth: { user: EMAIL_USER, pass: EMAIL_PASS },
+    })
+  : null;
+
+// Endpoint para el comando "attention": envía notificación por email
+app.post('/api/attention', async (req, res) => {
+  if (!transporter || !EMAIL_TO) {
+    return res.status(503).json({ error: 'Email no configurado en el servidor.' });
+  }
+
+  // El cliente puede enviar un segundo destinatario en el cuerpo de la petición
+  const rawEmail = typeof req.body.email === 'string' ? req.body.email.trim() : '';
+  if (rawEmail && !EMAIL_REGEX.test(rawEmail)) {
+    return res.status(400).json({ error: 'La dirección de email proporcionada no es válida.' });
+  }
+
+  // Construir la lista de destinatarios
+  const recipients = [EMAIL_TO];
+  if (EMAIL_TO_2) recipients.push(EMAIL_TO_2);
+  if (rawEmail) recipients.push(rawEmail);
+
+  try {
+    await transporter.sendMail({
+      from: EMAIL_FROM,
+      to: recipients.join(', '),
+      subject: 'Notificación BIMtegracion',
+      text: 'Tiene una nueva notificación en BIMtegracion.',
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error al enviar email:', err.message);
+    res.status(500).json({ error: 'No se pudo enviar el email.' });
+  }
 });
 
 // 3. Crear el servidor de WebSockets
