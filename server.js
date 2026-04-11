@@ -25,9 +25,14 @@ const server = http.createServer(app);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Ruta HTTP raíz — devuelve la UI del chat
+// Ruta HTTP raíz — devuelve la UI del chat (Magic)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Ruta alternativa — devuelve la UI del chat (enigma)
+app.get('/enigma', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'enigma.html'));
 });
 
 // Validación básica de formato de email
@@ -74,37 +79,41 @@ app.post('/api/attention', async (req, res) => {
   }
 });
 
-// 3. Crear el servidor de WebSockets
-const wss = new WebSocket.Server({ server });
+// 3. Crear el servidor de WebSockets (sin path fijo — ruteamos manualmente)
+const wss = new WebSocket.Server({ noServer: true });
 
-// 4. La Lógica del Chat
-let clients = [];
-let nextId = 1; // Contador incremental para IDs únicos
+// 4. La Lógica del Chat — dos salas independientes
+const rooms = {
+  magic:  { clients: [], nextId: 1 },
+  enigma: { clients: [], nextId: 1 },
+};
 
-wss.on('connection', (ws) => {
+function handleConnection(ws, roomName) {
+  const room = rooms[roomName];
+
   // --- A. CUANDO ALGUIEN NUEVO SE CONECTA ---
   // Limpiar sockets obsoletos antes de evaluar el aforo
-  clients = clients.filter(c => c.socket.readyState === WebSocket.OPEN);
+  room.clients = room.clients.filter(c => c.socket.readyState === WebSocket.OPEN);
 
-  if (clients.length >= 2) {
+  if (room.clients.length >= 2) {
     ws.send(JSON.stringify({ type: 'full' }));
     ws.close();
     return;
   }
 
   // Reiniciar el contador cuando la sala está vacía
-  if (clients.length === 0) {
-    nextId = 1;
+  if (room.clients.length === 0) {
+    room.nextId = 1;
   }
 
-  const clientId = nextId++;
-  clients.push({ id: clientId, socket: ws });
-  console.log(`Cliente #${clientId} conectado.`);
+  const clientId = room.nextId++;
+  room.clients.push({ id: clientId, socket: ws });
+  console.log(`[${roomName}] Cliente #${clientId} conectado.`);
   ws.send(JSON.stringify({ type: 'assign_id', id: clientId }));
 
   // Notificar a ambos lados si ya hay dos clientes
-  if (clients.length === 2) {
-    clients.forEach((client) => {
+  if (room.clients.length === 2) {
+    room.clients.forEach((client) => {
       if (client.socket.readyState === WebSocket.OPEN) {
         client.socket.send(JSON.stringify({ type: 'peer_connected' }));
       }
@@ -122,7 +131,7 @@ wss.on('connection', (ws) => {
       // Limitar la longitud del texto
       const text = parsedMessage.text.slice(0, MAX_TEXT_LENGTH);
 
-      clients.forEach((client) => {
+      room.clients.forEach((client) => {
         if (client.id !== parsedMessage.id && client.socket.readyState === WebSocket.OPEN) {
           client.socket.send(JSON.stringify({
             type: 'chat_message',
@@ -138,18 +147,36 @@ wss.on('connection', (ws) => {
 
   // --- C. CUANDO ALGUIEN SE DESCONECTA ---
   ws.on('close', () => {
-    const closedClient = clients.find(client => client.socket === ws);
+    const closedClient = room.clients.find(client => client.socket === ws);
     if (closedClient) {
-      clients = clients.filter(client => client.socket !== ws);
-      console.log(`Cliente #${closedClient.id} se ha desconectado.`);
+      room.clients = room.clients.filter(client => client.socket !== ws);
+      console.log(`[${roomName}] Cliente #${closedClient.id} se ha desconectado.`);
 
       // Notificar al peer que el otro se desconectó
-      clients.forEach((client) => {
+      room.clients.forEach((client) => {
         if (client.socket.readyState === WebSocket.OPEN) {
           client.socket.send(JSON.stringify({ type: 'peer_disconnected' }));
         }
       });
     }
+  });
+}
+
+// Rutear upgrades HTTP → sala correcta según el path de la URL
+server.on('upgrade', (req, socket, head) => {
+  const url = req.url ? req.url.split('?')[0] : '';
+  let roomName;
+  if (url === '/ws/magic') {
+    roomName = 'magic';
+  } else if (url === '/ws/enigma') {
+    roomName = 'enigma';
+  } else {
+    socket.destroy();
+    return;
+  }
+
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    handleConnection(ws, roomName);
   });
 });
 
