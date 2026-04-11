@@ -28,10 +28,18 @@ let nextId = 1; // Contador incremental para IDs únicos
 
 wss.on('connection', (ws) => {
   // --- A. CUANDO ALGUIEN NUEVO SE CONECTA ---
+  // Limpiar sockets obsoletos antes de evaluar el aforo
+  clients = clients.filter(c => c.socket.readyState === WebSocket.OPEN);
+
   if (clients.length >= 2) {
     ws.send(JSON.stringify({ type: 'full' }));
     ws.close();
     return;
+  }
+
+  // Reiniciar el contador cuando la sala está vacía
+  if (clients.length === 0) {
+    nextId = 1;
   }
 
   const clientId = nextId++;
