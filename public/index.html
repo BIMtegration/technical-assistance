@@ -394,6 +394,15 @@
         return;
       }
 
+      // Comando "enigma" — ir al chat enigma
+      if (/^enigma$/i.test(text)) {
+        inputEl.value = '';
+        inputEl.style.height = 'auto';
+        updateSendBtn();
+        window.location.href = '/enigma';
+        return;
+      }
+
       if (!peerPresent || !ws || ws.readyState !== WebSocket.OPEN) return;
 
       ws.send(JSON.stringify({ id: myId, text }));
@@ -466,7 +475,7 @@
             // Sala llena — seguir intentando silenciosamente
             setDot('connecting');
             setBanner('reconnecting', '⏳ Conectando…');
-            reconnectTimer = setTimeout(connect, 5000);
+            ws.close(); // dejamos que el handler 'close' programe el reconnect
             break;
         }
       });
@@ -476,6 +485,7 @@
         peerPresent = false;
         updateSendBtn();
         setBanner('reconnecting', '⏳ Reconectando…');
+        clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(connect, 3000);
       });
 
