@@ -5,14 +5,22 @@ const WebSocket = require('ws');
 
 // 2. Configuración inicial
 const port = process.env.PORT || 3000; // Render usará una variable, nosotros usamos 3000
+const MAX_TEXT_LENGTH = 1000;
+
 const app = express();
 const server = http.createServer(app);
+
+// Ruta HTTP raíz básica
+app.get('/', (req, res) => {
+  res.send('Servidor de asistencia técnica activo.');
+});
 
 // 3. Crear el servidor de WebSockets
 const wss = new WebSocket.Server({ server });
 
 // 4. La Lógica del Chat
 let clients = [];
+let nextId = 1; // Contador incremental para IDs únicos
 
 wss.on('connection', (ws) => {
   // --- A. CUANDO ALGUIEN NUEVO SE CONECTA ---
@@ -22,23 +30,34 @@ wss.on('connection', (ws) => {
     return;
   }
 
-  const clientId = clients.length + 1;
+  const clientId = nextId++;
   clients.push({ id: clientId, socket: ws });
   console.log(`Cliente #${clientId} conectado.`);
   ws.send(JSON.stringify({ type: 'assign_id', id: clientId }));
 
   // --- B. CUANDO RECIBIMOS UN MENSAJE ---
   ws.on('message', (message) => {
-    const parsedMessage = JSON.parse(message);
-    clients.forEach((client) => {
-      if (client.id !== parsedMessage.id && client.socket.readyState === WebSocket.OPEN) {
-        client.socket.send(JSON.stringify({
-          type: 'chat_message',
-          id: parsedMessage.id,
-          text: parsedMessage.text
-        }));
-      }
-    });
+    try {
+      const parsedMessage = JSON.parse(message);
+
+      // Validar que el mensaje tenga los campos esperados
+      if (!parsedMessage.id || typeof parsedMessage.text !== 'string') return;
+
+      // Limitar la longitud del texto
+      const text = parsedMessage.text.slice(0, MAX_TEXT_LENGTH);
+
+      clients.forEach((client) => {
+        if (client.id !== parsedMessage.id && client.socket.readyState === WebSocket.OPEN) {
+          client.socket.send(JSON.stringify({
+            type: 'chat_message',
+            id: parsedMessage.id,
+            text
+          }));
+        }
+      });
+    } catch (e) {
+      console.error('Mensaje inválido recibido:', e.message);
+    }
   });
 
   // --- C. CUANDO ALGUIEN SE DESCONECTA ---
@@ -47,6 +66,13 @@ wss.on('connection', (ws) => {
     if (closedClient) {
       clients = clients.filter(client => client.socket !== ws);
       console.log(`Cliente #${closedClient.id} se ha desconectado.`);
+
+      // Notificar al peer que el otro se desconectó
+      clients.forEach((client) => {
+        if (client.socket.readyState === WebSocket.OPEN) {
+          client.socket.send(JSON.stringify({ type: 'peer_disconnected' }));
+        }
+      });
     }
   });
 });
