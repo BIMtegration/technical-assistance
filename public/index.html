@@ -418,7 +418,7 @@
     // ─── WebSocket ───────────────────────────────────────────────
     function buildWsUrl() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      return `${proto}://${location.host}`;
+      return `${proto}://${location.host}/ws/magic`;
     }
 
     function connect() {
@@ -463,8 +463,10 @@
             break;
 
           case 'full':
-            addSystemMsg('La sala está llena. Inténtalo más tarde.');
-            setBanner('disconnected', '🚫 La sala está llena.');
+            // Sala llena — seguir intentando silenciosamente
+            setDot('connecting');
+            setBanner('reconnecting', '⏳ Conectando…');
+            reconnectTimer = setTimeout(connect, 5000);
             break;
         }
       });
