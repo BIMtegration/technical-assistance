@@ -1,0 +1,18 @@
+{
+  "name": "Asistencia Técnica",
+  "short_name": "Asistencia",
+  "description": "Chat de asistencia técnica en tiempo real",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F5F5",
+  "theme_color": "#1565C0",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231565C0'/><path d='M20 30h60v35H20z' rx='6' fill='white' opacity='.9'/><path d='M35 72l10-7h25v-7H20v7h5z' fill='white' opacity='.9'/></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

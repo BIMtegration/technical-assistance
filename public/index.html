@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1565C0" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="/manifest.json" />
+  <title>Asistencia Técnica</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --color-primary:   #1565C0;
+      --color-own-bg:    #1976D2;
+      --color-own-text:  #ffffff;
+      --color-peer-bg:   #ECEFF1;
+      --color-peer-text: #212121;
+      --color-surface:   #ffffff;
+      --color-bg:        #F5F5F5;
+      --color-border:    #CFD8DC;
+      --color-warning:   #F57F17;
+      --color-error:     #B71C1C;
+      --color-success:   #1B5E20;
+      --radius-bubble:   18px;
+      --header-h:        56px;
+    }
+
+    html, body {
+      height: 100%;
+      /* dvh = dynamic viewport height — accounts for Android Chrome UI collapsing */
+      min-height: 100dvh;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      background: var(--color-bg);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 15px;
+      color: var(--color-peer-text);
+      /* Prevent body scroll; only the message list scrolls */
+      overflow: hidden;
+    }
+
+    /* ─── HEADER ─────────────────────────────────────────────── */
+    header {
+      flex-shrink: 0;
+      height: var(--header-h);
+      background: var(--color-primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      padding-top: env(safe-area-inset-top);
+      user-select: none;
+      gap: 10px;
+      box-shadow: 0 2px 4px rgba(0,0,0,.25);
+      z-index: 10;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      flex: 1;
+    }
+
+    #connection-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ef9a9a;
+      flex-shrink: 0;
+      transition: background .3s;
+    }
+
+    #connection-dot.connected    { background: #a5d6a7; }
+    #connection-dot.connecting   { background: #ffe082; }
+
+    /* ─── STATUS BANNER ──────────────────────────────────────── */
+    #status-banner {
+      flex-shrink: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      user-select: none;
+    }
+
+    #status-banner.waiting {
+      display: flex;
+      background: #FFF9C4;
+      color: var(--color-warning);
+    }
+
+    #status-banner.disconnected {
+      display: flex;
+      background: #FFCDD2;
+      color: var(--color-error);
+    }
+
+    #status-banner.reconnecting {
+      display: flex;
+      background: #E3F2FD;
+      color: var(--color-primary);
+    }
+
+    /* ─── MESSAGE LIST ───────────────────────────────────────── */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      overscroll-behavior: contain;
+      padding: 12px 12px 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* ─── BUBBLE ─────────────────────────────────────────────── */
+    .bubble-wrapper {
+      display: flex;
+      flex-direction: column;
+      max-width: 80%;
+    }
+
+    .bubble-wrapper.own  { align-self: flex-end;  align-items: flex-end; }
+    .bubble-wrapper.peer { align-self: flex-start; align-items: flex-start; }
+
+    .bubble {
+      padding: 9px 13px;
+      border-radius: var(--radius-bubble);
+      line-height: 1.4;
+      word-break: break-word;
+      white-space: pre-wrap;
+      font-size: 15px;
+    }
+
+    .bubble-wrapper.own  .bubble {
+      background: var(--color-own-bg);
+      color: var(--color-own-text);
+      border-bottom-right-radius: 4px;
+    }
+
+    .bubble-wrapper.peer .bubble {
+      background: var(--color-peer-bg);
+      color: var(--color-peer-text);
+      border-bottom-left-radius: 4px;
+    }
+
+    .bubble-time {
+      font-size: 11px;
+      color: #90A4AE;
+      margin-top: 2px;
+      padding: 0 4px;
+    }
+
+    /* System messages (centered) */
+    .system-msg {
+      align-self: center;
+      font-size: 12px;
+      color: #90A4AE;
+      background: rgba(0,0,0,.05);
+      border-radius: 12px;
+      padding: 4px 10px;
+      user-select: none;
+    }
+
+    /* ─── INPUT AREA ─────────────────────────────────────────── */
+    #input-area {
+      flex-shrink: 0;
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      padding: 8px 12px;
+      /* Safe area for Android gesture nav bar */
+      padding-bottom: calc(8px + env(safe-area-inset-bottom));
+      background: var(--color-surface);
+      border-top: 1px solid var(--color-border);
+      /* Sticky at bottom of flex container */
+      position: sticky;
+      bottom: 0;
+    }
+
+    #msg-input {
+      flex: 1;
+      resize: none;
+      border: 1.5px solid var(--color-border);
+      border-radius: 22px;
+      padding: 10px 16px;
+      font-size: 16px; /* ≥16px prevents auto-zoom on Android */
+      font-family: inherit;
+      line-height: 1.4;
+      max-height: 120px;
+      overflow-y: auto;
+      background: var(--color-bg);
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    #msg-input:focus {
+      border-color: var(--color-primary);
+    }
+
+    #send-btn {
+      flex-shrink: 0;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: none;
+      background: var(--color-primary);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      /* Eliminate 300ms tap delay */
+      touch-action: manipulation;
+      user-select: none;
+      transition: background .15s, transform .1s;
+    }
+
+    #send-btn:active  { transform: scale(.92); }
+    #send-btn:disabled {
+      background: var(--color-border);
+      cursor: default;
+    }
+
+    #send-btn svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div id="connection-dot" class="connecting" aria-hidden="true"></div>
+    <h1>Asistencia Técnica</h1>
+  </header>
+
+  <div id="status-banner" role="status" aria-live="polite"></div>
+
+  <div id="messages" aria-live="polite" aria-label="Mensajes"></div>
+
+  <div id="input-area">
+    <textarea
+      id="msg-input"
+      rows="1"
+      placeholder="Escribe un mensaje…"
+      aria-label="Mensaje"
+      maxlength="1000"
+    ></textarea>
+    <button id="send-btn" aria-label="Enviar" disabled>
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+      </svg>
+    </button>
+  </div>
+
+  <script>
+    // ─── DOM refs ───────────────────────────────────────────────
+    const messagesEl  = document.getElementById('messages');
+    const inputEl     = document.getElementById('msg-input');
+    const sendBtn     = document.getElementById('send-btn');
+    const banner      = document.getElementById('status-banner');
+    const dot         = document.getElementById('connection-dot');
+
+    // ─── State ──────────────────────────────────────────────────
+    let myId        = null;
+    let peerPresent = false;
+    let ws          = null;
+    let reconnectTimer = null;
+
+    // ─── Helpers ────────────────────────────────────────────────
+    function now() {
+      return new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function scrollToBottom() {
+      messagesEl.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    function addBubble(text, side) {
+      const wrapper = document.createElement('div');
+      wrapper.className = `bubble-wrapper ${side}`;
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = text;
+
+      const time = document.createElement('span');
+      time.className = 'bubble-time';
+      time.textContent = now();
+
+      wrapper.appendChild(bubble);
+      wrapper.appendChild(time);
+      messagesEl.appendChild(wrapper);
+      scrollToBottom();
+    }
+
+    function addSystemMsg(text) {
+      const el = document.createElement('div');
+      el.className = 'system-msg';
+      el.textContent = text;
+      messagesEl.appendChild(el);
+      scrollToBottom();
+    }
+
+    function setDot(state) {
+      dot.className = state; // 'connecting' | 'connected' | ''
+    }
+
+    function setBanner(type, text) {
+      if (!type) {
+        banner.style.display = 'none';
+        banner.className = '';
+        return;
+      }
+      banner.className = type;
+      banner.textContent = text;
+    }
+
+    function updateSendBtn() {
+      sendBtn.disabled = !peerPresent || inputEl.value.trim() === '';
+    }
+
+    // ─── Textarea auto-grow ──────────────────────────────────────
+    inputEl.addEventListener('input', () => {
+      inputEl.style.height = 'auto';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+      updateSendBtn();
+    });
+
+    // Send on Enter (but Shift+Enter = new line)
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    sendBtn.addEventListener('click', sendMessage);
+    sendBtn.addEventListener('touchend', (e) => {
+      e.preventDefault(); // avoid ghost click
+      sendMessage();
+    });
+
+    function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text || !peerPresent || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+      ws.send(JSON.stringify({ id: myId, text }));
+      addBubble(text, 'own');
+
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+      updateSendBtn();
+      inputEl.focus();
+    }
+
+    // ─── Virtual keyboard — Android Chrome fix ───────────────────
+    // When the virtual keyboard appears, window.innerHeight shrinks but
+    // 100dvh sometimes doesn't update fast enough. visualViewport is reliable.
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        // Force the messages container to scroll to bottom when keyboard opens
+        scrollToBottom();
+      });
+    }
+
+    // ─── WebSocket ───────────────────────────────────────────────
+    function buildWsUrl() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      return `${proto}://${location.host}`;
+    }
+
+    function connect() {
+      setDot('connecting');
+      setBanner('reconnecting', '⏳ Conectando…');
+
+      ws = new WebSocket(buildWsUrl());
+
+      ws.addEventListener('open', () => {
+        setDot('connected');
+        clearTimeout(reconnectTimer);
+      });
+
+      ws.addEventListener('message', (event) => {
+        let msg;
+        try { msg = JSON.parse(event.data); } catch { return; }
+
+        switch (msg.type) {
+          case 'assign_id':
+            myId = msg.id;
+            addSystemMsg('Conectado. Esperando al otro participante…');
+            setBanner('waiting', '⏳ Esperando al otro participante…');
+            updateSendBtn();
+            break;
+
+          case 'chat_message':
+            addBubble(msg.text, 'peer');
+            break;
+
+          case 'peer_connected':
+            peerPresent = true;
+            setBanner(null);
+            addSystemMsg('El otro participante se unió.');
+            updateSendBtn();
+            break;
+
+          case 'peer_disconnected':
+            peerPresent = false;
+            addSystemMsg('El otro participante se desconectó.');
+            setBanner('disconnected', '⚠️ El otro participante se desconectó.');
+            updateSendBtn();
+            break;
+
+          case 'full':
+            addSystemMsg('La sala está llena. Inténtalo más tarde.');
+            setBanner('disconnected', '🚫 La sala está llena.');
+            break;
+        }
+      });
+
+      ws.addEventListener('close', () => {
+        setDot('');
+        peerPresent = false;
+        updateSendBtn();
+        setBanner('reconnecting', '⏳ Reconectando…');
+        reconnectTimer = setTimeout(connect, 3000);
+      });
+
+      ws.addEventListener('error', () => {
+        ws.close();
+      });
+    }
+
+    connect();
+  </script>
+</body>
+</html>

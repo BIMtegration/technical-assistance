@@ -1,6 +1,7 @@
 // 1. Importar las librerías
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const WebSocket = require('ws');
 
 // 2. Configuración inicial
@@ -10,9 +11,12 @@ const MAX_TEXT_LENGTH = 1000;
 const app = express();
 const server = http.createServer(app);
 
-// Ruta HTTP raíz básica
+// Servir archivos estáticos desde /public
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Ruta HTTP raíz — devuelve la UI del chat
 app.get('/', (req, res) => {
-  res.send('Servidor de asistencia técnica activo.');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // 3. Crear el servidor de WebSockets
@@ -34,6 +38,15 @@ wss.on('connection', (ws) => {
   clients.push({ id: clientId, socket: ws });
   console.log(`Cliente #${clientId} conectado.`);
   ws.send(JSON.stringify({ type: 'assign_id', id: clientId }));
+
+  // Notificar a ambos lados si ya hay dos clientes
+  if (clients.length === 2) {
+    clients.forEach((client) => {
+      if (client.socket.readyState === WebSocket.OPEN) {
+        client.socket.send(JSON.stringify({ type: 'peer_connected' }));
+      }
+    });
+  }
 
   // --- B. CUANDO RECIBIMOS UN MENSAJE ---
   ws.on('message', (message) => {
