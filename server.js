@@ -25,9 +25,14 @@ const server = http.createServer(app);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Ruta HTTP raíz — devuelve la UI del chat
+// Ruta HTTP raíz — devuelve la UI del chat (Magic)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Ruta alternativa — devuelve la UI del chat (enigma)
+app.get('/enigma', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'enigma.html'));
 });
 
 // Validación básica de formato de email
