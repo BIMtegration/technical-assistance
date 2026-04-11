@@ -393,6 +393,15 @@
         return;
       }
 
+      // Comando "Magic" — ir al chat Magic (insensible a mayúsculas)
+      if (/^magic$/i.test(text)) {
+        inputEl.value = '';
+        inputEl.style.height = 'auto';
+        updateSendBtn();
+        window.location.href = '/';
+        return;
+      }
+
       if (!peerPresent || !ws || ws.readyState !== WebSocket.OPEN) return;
 
       ws.send(JSON.stringify({ id: myId, text }));
@@ -459,10 +468,10 @@
             break;
 
           case 'full':
-            // La sala está ocupada por el otro canal — seguir intentando silenciosamente
+            // Esta sala alcanzó el aforo máximo (2 participantes) — seguir intentando silenciosamente
             setDot('connecting');
             setBanner('reconnecting', '⏳ Conectando…');
-            reconnectTimer = setTimeout(connect, 5000);
+            ws.close(); // dejamos que el handler 'close' programe el reconnect
             break;
         }
       });
@@ -472,6 +481,7 @@
         peerPresent = false;
         updateSendBtn();
         setBanner('reconnecting', '⏳ Reconectando…');
+        clearTimeout(reconnectTimer);
         reconnectTimer = setTimeout(connect, 3000);
       });
 

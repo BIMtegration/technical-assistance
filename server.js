@@ -30,6 +30,11 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Alias /magic → misma UI que /
+app.get('/magic', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // Ruta alternativa — devuelve la UI del chat (enigma)
 app.get('/enigma', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'enigma.html'));
